@@ -1,0 +1,18 @@
+Sub InsertPictureWindow_机运设备状态()
+Dim objPic As HMIPictureWindow
+Set Pic = ActiveDocument.HMIObjects.AddHMIObject("机运设备状态", "HMIPictureWindow")
+With Pic
+    .Top = 21
+    .Left = 225
+    .Width = 1470
+    .Height = 820
+    .Moveable = True
+    .WindowBorder = True
+    .Caption = True
+    .CloseButton = True
+    .OnTop = True
+    .AdaptPicture = True
+End With
+ActiveDocument.Save
+ActiveDocument.Close
+End Sub

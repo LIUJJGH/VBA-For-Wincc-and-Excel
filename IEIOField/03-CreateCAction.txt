@@ -1,0 +1,34 @@
+Sub CreateCActionToClickedEvent(objHMIObject As HMIObject)
+
+'VBA66
+
+Dim objIOField As HMIIOField
+Dim objEvent As HMIEvent
+Dim objCScript As HMIScriptInfo
+Dim strCode As String
+
+strCode = "long lHeight;" & vbCrLf & "int check;" & vbCrLf
+strCode = strCode & "lHeight = GetHeight (""events.PDL"", ""myCircle"");"
+strCode = strCode & vbCrLf & "lHeight = lHeight+5;" & vbCrLf & "check = "
+strCode = strCode & "SetHeight(""events.PDL"", ""myCircle"",lHeight);"
+strCode = strCode & vbCrLf & "//Return-Type: Void"
+
+Set objIOField = ActiveDocument.HMIObjects.AddHMIObject(objHMIObject, "HMIIOField")
+
+'Configure directconnection:
+
+Set objCScript = objIOField.Events(7).Actions.AddAction(hmiActionCreationTypeCScript)
+
+With objCScript
+
+'
+
+'Note: Replace "events.PDL" with your picturename
+
+.SourceCode = strCode
+
+End With
+
+End Sub
+
+

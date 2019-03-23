@@ -1,0 +1,298 @@
+Sub CreateCActionToClickedEvent()
+
+'VBA66
+
+Dim objButton As HMIButton
+
+Dim objCircle As HMICircle
+
+Dim objEvent As HMIEvent
+
+Dim objCScript As HMIScriptInfo
+
+Dim strCode As String
+
+strCode = "long lHeight;" & vbCrLf & "int check;" & vbCrLf
+
+strCode = strCode & "lHeight = GetHeight (""events.PDL"", ""myCircle"");"
+
+strCode = strCode & vbCrLf & "lHeight = lHeight+5;" & vbCrLf & "check = "
+
+strCode = strCode & "SetHeight(""events.PDL"", ""myCircle"",lHeight);"
+
+strCode = strCode & vbCrLf & "//Return-Type: Void"
+
+Set objCircle = ActiveDocument.HMIObjects.AddHMIObject("myCircle", "HMICircle")
+
+Set objButton = ActiveDocument.HMIObjects.AddHMIObject("myButton", "HMIButton")
+
+With objCircle
+
+.Top = 100
+
+.Left = 100
+
+.BackColor = RGB(255, 0, 0)
+
+End With
+
+With objButton
+
+.Top = 10
+
+.Left = 10
+
+.Text = "Increase height"
+
+End With
+
+'Configure directconnection:
+
+Set objCScript = objButton.Events(1).Actions.AddAction(hmiActionCreationTypeCScript)
+
+With objCScript
+
+'
+
+'Note: Replace "events.PDL" with your picturename
+
+.SourceCode = strCode
+
+End With
+
+End Sub
+
+Sub FindObjectsByType()
+
+'VBA37
+
+Dim colSearchResults As HMICollection
+
+Dim objMember As HMIObject
+
+Dim iResult As Integer
+
+Dim strName As String
+
+Set colSearchResults = ActiveDocument.HMIObjects.Find(ObjectType:="HMICircle")
+
+For Each objMember In colSearchResults
+
+iResult = colSearchResults.Count
+
+strName = objMember.ObjectName
+
+MsgBox "Found: " & CStr(iResult) & vbCrLf & "Objektname: " & strName
+
+Next objMember
+
+End Sub
+
+
+Sub EditDefinedObjectType()
+
+'VBA33
+
+Dim objCircle As HMICircle
+
+Set objCircle = ActiveDocument.HMIObjects.Find
+With objCircle
+
+'direct calling of objectproperties available
+
+.Properties("BorderWidth") = 4
+
+.Properties("BorderColor") = RGB(255, 0, 0)
+
+
+End With
+
+End Sub
+
+Sub ImportObjectListFromXLSX()
+'VBA75
+Dim objGDApplication As grafexe.Application
+Dim objDoc As grafexe.Document
+Dim objHMIObject As grafexe.HMIObject
+Dim objXLS As Excel.Application
+Dim objWSheet As Excel.Worksheet
+Dim objWBook As Excel.Workbook
+Dim lRow As Long
+Dim strWorkbookName As String
+Dim strWorksheetName As String
+Dim strSheets As String
+
+Dim objVariableTrigger As HMIVariableTrigger    '动态化变量
+ 
+'define local errorhandler
+On Local Error GoTo LocErrTrap
+ 
+'Set references on the applications Excel and GraphicsDesigner
+Set objGDApplication = Application
+Set objDoc = objGDApplication.ActiveDocument
+Set objXLS = New Excel.Application
+ 
+'Open workbook. The workbook have to be in datapath of GraphicsDesigner
+strWorkbookName = InputBox("Name of workbook:", "Import of objects")
+Set objWBook = objXLS.Workbooks.Open(objGDApplication.ApplicationDataPath & "..\" & strWorkbookName)
+On Local Error GoTo LocErrTrap
+
+If objWBook Is Nothing Then
+MsgBox "Open workbook fails!" & vbCrLf & "This function is cancled!", vbCritical, "Import od objects"
+Set objDoc = Nothing
+Set objGDApplication = Nothing
+Set objXLS = Nothing
+Exit Sub
+End If
+ 
+'Read out the names of all worksheets contained in the workbook
+For Each objWSheet In objWBook.Sheets
+strSheets = strSheets & objWSheet.Name & vbCrLf
+Next objWSheet
+strWorksheetName = InputBox("Name of table to import:" & vbCrLf & strSheets, "Import of objects")
+Set objWSheet = objWBook.Sheets(strWorksheetName)
+lRow = 3
+ 
+'Import the worksheet as long as in actual row the first column is empty.
+'Add with the outreaded data new objects to the active document and
+'assign the values to the objectproperties
+With objWSheet
+While (.Cells(lRow, 1).value <> vbNullString) And (Not IsEmpty(.Cells(lRow, 1).value))
+'Add the objects to the document as its objecttype,
+'do nothing by groups, their have to create before.
+If (UCase(.Cells(lRow, 2).value) = "HMIGROUP") Then
+Else
+  If (UCase(.Cells(lRow, 2).value) = "HMIACTIVEXCONTROL") Then
+    Set objHMIObject = objDoc.HMIObjects.AddActiveXControl(.Cells(lRow, 1).value, .Cells(lRow, 3).value)
+  Else
+    Set objHMIObject = objDoc.HMIObjects.AddHMIObject(.Cells(lRow, 1).value, .Cells(lRow, 2).value)
+    
+    '设置和连接动态变量
+    Set objVariableTrigger = objHMIObject.OutputValue.CreateDynamic(hmiDynamicCreationTypeVariableDirect, .Cells(lRow, 9).value)
+        objVariableTrigger.CycleType = hmiVariableCycleType_有变化时
+  End If
+  
+'----------------从单元格中获取属性值
+  objHMIObject.Left = .Cells(lRow, 4).value
+  objHMIObject.Top = .Cells(lRow, 5).value
+  objHMIObject.Width = .Cells(lRow, 6).value
+  objHMIObject.Height = .Cells(lRow, 7).value
+  objHMIObject.Layer = .Cells(lRow, 8).value
+  '输出值，数据格式，输出格式
+  objHMIObject.OutputValue = .Cells(lRow, 9).value
+  objHMIObject.DataFormat = .Cells(lRow, 10).value
+  objHMIObject.OutputFormat = .Cells(lRow, 11).value
+  
+  '背景颜色，字体，字体大小，x轴对齐,y轴对齐
+  objHMIObject.BackColor = .Cells(lRow, 12).value
+  objHMIObject.FONTNAME = .Cells(lRow, 13).value
+  objHMIObject.FONTSIZE = .Cells(lRow, 14).value
+  objHMIObject.AlignmentLeft = .Cells(lRow, 15).value
+  objHMIObject.AlignmentTop = .Cells(lRow, 16).value
+  
+End If
+Set objHMIObject = Nothing
+lRow = lRow + 1
+Wend
+End With
+objWBook.Close
+Set objWBook = Nothing
+objXLS.Quit
+Set objXLS = Nothing
+Set objDoc = Nothing
+Set objGDApplication = Nothing
+MsgBox "导入完成!"
+Exit Sub
+LocErrTrap:
+MsgBox Err.Description, , Err.Source
+Resume Next
+End Sub
+Sub ExportObjectListToXLS()
+'VBA74
+Dim objGDApplication As grafexe.Application
+Dim objDoc As grafexe.Document
+Dim objHMIObject As grafexe.HMIObject
+Dim objProperty As grafexe.HMIProperty
+Dim objXLS As Excel.Application
+Dim objWSheet As Excel.Worksheet
+Dim objWBook As Excel.Workbook
+Dim lRow As Long
+ 
+'Define local errorhandler
+On Local Error GoTo LocErrTrap
+ 
+'Set references on the applications Excel and GraphicsDesigner
+Set objGDApplication = grafexe.Application
+Set objDoc = objGDApplication.ActiveDocument
+Set objXLS = New Excel.Application
+ 
+'Create workbook
+Set objWBook = objXLS.Workbooks.Add()
+objWBook.SaveAs objGDApplication.ApplicationDataPath & "..\" & "IOField.xlsx"
+ 
+'Create worksheet in the new workbook and write headline
+'The name of the worksheet is equivalent to the documents name
+Set objWSheet = objWBook.Worksheets.Add
+objWSheet.Name = objDoc.Name
+objWSheet.Cells(1, 1) = "Objektname"
+objWSheet.Cells(1, 2) = "Objekttyp"
+objWSheet.Cells(1, 3) = "ProgID"
+objWSheet.Cells(1, 4) = "Position X"
+objWSheet.Cells(1, 5) = "Position Y"
+objWSheet.Cells(1, 6) = "Width"
+objWSheet.Cells(1, 7) = "H?he"
+objWSheet.Cells(1, 8) = "Ebene"
+
+objWSheet.Cells(1, 9) = "OutputValue"
+objWSheet.Cells(1, 10) = "DataFormat"
+objWSheet.Cells(1, 11) = "OutputFormat"
+
+objWSheet.Cells(1, 12) = "BackColor"
+objWSheet.Cells(1, 13) = "FONTNAME"
+objWSheet.Cells(1, 14) = "FONTSIZE"
+objWSheet.Cells(1, 15) = "AlignmentLeft"
+objWSheet.Cells(1, 16) = "AlignmentTop"
+
+lRow = 3
+ 
+'Every objects will be written with their objectproperties width,
+'height, pos x, pos y and layer to Excel. If the object is an
+'ActiveX-Control the ProgID will be also exported.
+For Each objHMIObject In objDoc.HMIObjects
+DoEvents
+objWSheet.Cells(lRow, 1).value = objHMIObject.ObjectName
+objWSheet.Cells(lRow, 2).value = objHMIObject.Type
+If UCase(objHMIObject.Type) = "HMIACTIVEXCONTROL" Then
+objWSheet.Cells(lRow, 3).value = objHMIObject.ProgID
+End If
+objWSheet.Cells(lRow, 4).value = objHMIObject.Left
+objWSheet.Cells(lRow, 5).value = objHMIObject.Top
+objWSheet.Cells(lRow, 6).value = objHMIObject.Width
+objWSheet.Cells(lRow, 7).value = objHMIObject.Height
+objWSheet.Cells(lRow, 8).value = objHMIObject.Layer
+objWSheet.Cells(lRow, 9).value = objHMIObject.OutputValue
+objWSheet.Cells(lRow, 10).value = objHMIObject.DataFormat
+objWSheet.Cells(lRow, 11).value = objHMIObject.OutputFormat
+objWSheet.Cells(lRow, 12).value = objHMIObject.BackColor
+objWSheet.Cells(lRow, 13).value = objHMIObject.FONTNAME
+objWSheet.Cells(lRow, 14).value = objHMIObject.FONTSIZE
+objWSheet.Cells(lRow, 15).value = objHMIObject.AlignmentLeft
+objWSheet.Cells(lRow, 16).value = objHMIObject.AlignmentTop
+lRow = lRow + 1
+Next objHMIObject
+objWSheet.Columns.AutoFit
+Set objWSheet = Nothing
+objWBook.Save
+objWBook.Close
+Set objWBook = Nothing
+objXLS.Quit
+Set objXLS = Nothing
+Set objDoc = Nothing
+Set objGDApplication = Nothing
+Exit Sub
+MsgBox "导出完成"
+LocErrTrap:
+MsgBox Err.Description, , Err.Source
+Resume Next
+End Sub
+
