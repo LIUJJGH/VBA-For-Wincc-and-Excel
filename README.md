@@ -1,4 +1,2 @@
 # hello-world
-Just another repository
-你好这是我的第一个文本，哈
-haohao xuexi 
+记录平常写的一些小代码 > _ <
