@@ -1,0 +1,191 @@
+Dim sStyle(6,6) As String	'分色区内车型
+Dim sColour(6,6) As String	'分色区内颜色
+Dim rStyle_EN(6),rColour_EN(6),MaxNum_EN,SamePC_EN As Boolean '规则使能
+Dim Enter_EN(6) As Boolean '入口封禁
+Dim rStyle(6,7) As String	'分色区车型规则
+Dim rColour(6,7) As String	'分色区颜色规则
+Dim Num(6) As Integer '每道车辆数
+Dim NumNow As Integer '当前连续过车数
+Dim MaxNum As Integer '最大连续过车数
+Dim SamePC(2,6) As String '相同中涂颜色
+
+
+Sub GetData() '获取现场车辆信息
+	Dim a,b,c As Integer
+
+	For a = 1 To 6
+	  Num(a) = PointGet("ColourGroup.Data." & a & ".Num")
+	  Enter_EN(a) = PointGet("ColourGroup.Data." & a & ".Enter_EN") 
+	  If Num(a) > 0 Then 
+	     For b = 1 To 6
+			 sStyle(a,b) = PointGet("ColourGroup.Data." & a & "." & b &".Style")
+			 sColour(a,b) = PointGet("ColourGroup.Data." & a & "." & b &".Colour")
+	     Next b
+	  End If
+	Next a
+End Sub
+
+Sub GetRule() '获取路有规则信息
+	Dim a,b,c As Integer
+	
+	MaxNum_EN = PointGet("ColourGroup.Rule.MaxNum.EN")  '最大连续过车数
+	If MaxNum_En = true Then
+	   MaxNum = PointGet("ColourGroup.Rule.MaxNum.Num")
+	End If
+	
+	SamePC_EN = PointGet("ColourGroup.Rule.SamePC.EN") '相同中涂漆颜色
+	If SamePC_EN = true Then
+	   For a = 1 To 6 
+		   SamePC(1,a) = PointGet("ColourGroup.Rule.SamePC.1_Colour." & a )
+		   SamePC(2,a) = PointGet("ColourGroup.Rule.SamePC.2_Colour." & a )
+	   Next a
+	End If
+
+	For b = 1 To 6 '道次车型颜色规则
+		rStyle_EN(b) = PointGet("ColourGroup.Rule.Style." & b & ".EN")
+		rColour_EN(b) = PointGet("ColourGroup.Rule.Colour." & b & ".EN")
+		For c = 1 To 7
+			If rStyle_EN(b) = true Then
+			   rStyle(b,c) = PointGet("ColourGroup.Rule.Style." & b & "." & c)
+			End If
+			If rColour_EN(b) = true Then
+			   rColour(b,c) = PointGet("ColourGroup.Rule.Colour." & b & "." & c)
+			End If  
+		Next c 
+	Next b
+End Sub
+
+Function StyleRule(Route As Integer,NowStyle As String) As Boolean '判断是否满足车型规则
+	Dim a,b,c As Integer
+	
+	If rStyle_EN(Route) = false Then
+	   StyleRule = true
+	   Return
+	Else
+	   For a = 1 To 7 
+	   	   If rStyle(Route,a) = NowStyle Then
+			  StyleRule = true
+			  Return
+	   	   End If
+	   Next a 
+	End If
+	StyleRule = false
+	Return     
+End Function
+
+Function ColourRule(Route As Integer,NowColour As String) As Boolean '判断是否满足颜色规则
+	Dim a,b,c As Integer
+	
+	If rColour_EN(Route) = false Then
+	   ColourRule = true
+	   Return
+	Else
+	   For a = 1 To 7 
+	   	   If rColour(Route,a) = NowColour Then
+			  ColourRule = true
+			  Return
+	   	   End If
+	   Next a 
+	End If
+	ColourRule = false
+	Return     
+End Function
+
+Function SamePCRoute(Route As Integer,NowColour As String) As Boolean '判断是否有同中涂
+	Dim a,b,c As Integer
+	Dim PCNum As Integer
+	
+	PCNum = 0
+	SamePCRoute = false
+	For a = 1 To 2 
+	   For b = 1 To 6
+		  If sColour(Route,Num(Route)) = SamePC(a,b) And SamePC(a,b) <> "" Then
+		  	 PCNum = a
+		  End If  
+	   Next b
+	Next
+	If PCNum = 0 Then
+	   Return
+	Else
+	   For c = 1 To 6
+		  If SamePC(a,b) = NowColour And SamePC(a,b) <> "" Then
+		  	 SamePCRoute = true
+			 Return
+		  End If 
+	   Next c
+	End If
+
+
+End Function
+
+Function SameColourRoute(NowColour As String,NowStyle As String) As Integer	'判断是否有相同颜色道
+	Dim a As Integer
+	
+	For a = 6 To 1 Step -1
+		If Num(a) > 0 And Enter_EN(a) = false And Num(a) < 6 Then   
+		   If sColour(1,Num(a)) = NowColour And StyleRule(a,NowStyle) = true And ColourRule(a,NowColour) = true Then
+		   	  SameColourRoute = a
+			  Return
+		   End If  
+		End If 
+	Next a
+	If SamePC_EN = true Then   '判断相同中涂
+	   For a = 6 To 1 Step -1
+		   If Num(a) > 0 And Enter_EN(a) = false And Num(a) < 6 Then
+		   	  If SamePCRoute(a,NowColour) = true And StyleRule(a,NowStyle) = true And ColourRule(a,NowColour) = true Then
+				 SameColourRoute = a
+				 Return
+			  End If 
+		   End If  
+	   Next a 
+	End If 
+	SameColourRoute = 0
+	Return
+End Function
+
+
+
+Function MinNumRouet(NowColour As String,NowStyle As String) As Integer '寻找最少车数车道
+	Dim a As Integer
+	Dim MinNum As Integer
+	MinNum = 6
+	MinNumRouet = 0
+	For a = 6 To 1 Step -1
+		If Num(a) < MinNum And StyleRule(a,NowStyle) = true And ColourRule(a,NowColour) = true And Enter_EN(a) = false Then
+		   MinNum = Num(a)
+		   MinNumRouet = a
+		End If   
+	Next a 
+End Function
+
+Sub Main()
+On Error GoTo Err1
+   	Call GetData
+	Call GetRule
+	
+	Dim Route As Integer
+	Dim NowColour As String
+	Dim NowStyle As String
+	
+	NowColour = PointGet("ColourGroup.Data.ENTER.PRB5_164.Colour")
+	NowStyle = PointGet("ColourGroup.Data.ENTER.PRB5_164.Style")
+
+	Route = SameColourRoute(NowColour,NowStyle)
+	If Route <> 0 Then
+	   PointSet "ColourGroup.Route.Enter.Num",Route
+	   PointSet "ColourGroup.Route.Enter.OK",1
+	   Exit Sub
+	End If 
+	
+	Route = MinNumRouet(NowColour,NowStyle)
+	If Route <> 0 Then  
+	   PointSet "ColourGroup.Route.Enter.Num",Route
+	   PointSet "ColourGroup.Route.Enter.OK",1
+	   Exit Sub
+	End If 
+
+    Exit Sub
+
+Err1:
+	 
+End Sub
