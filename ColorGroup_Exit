@@ -1,0 +1,196 @@
+Dim sStyle(6,6) As String	'分色区内车型
+Dim sColour(6,6) As String	'分色区内颜色
+Dim rStyle_EN,rColour_EN,MaxNum_EN,SamePC_EN As Boolean '规则使能
+Dim Exit_EN(6) As Boolean '入口封禁
+Dim rStyle(7) As String	'分色区车型规则
+Dim rColour(7) As String	'分色区颜色规则
+Dim Num(6) As Integer '每道车辆数
+Dim NumNow As Integer '当前连续过车数
+Dim MaxNum As Integer '最大连续过车数
+Dim SamePC(2,6) As String '相同中涂颜色
+
+
+Sub GetData() '获取现场车辆信息
+	Dim a,b,c As Integer
+
+	For a = 1 To 6
+	  Num(a) = PointGet("ColourGroup.Data." & a & ".Num")  
+	  Exit_EN(a) = PointGet("ColourGroup.Data." & a & ".Exit_EN") 
+	  If Num(a) > 0 Then 
+	     For b = 1 To 6
+			 sStyle(a,b) = PointGet("ColourGroup.Data." & a & "." & b &".Style")
+			 sColour(a,b) = PointGet("ColourGroup.Data." & a & "." & b &".Colour")
+	     Next b
+	  End If
+	Next a
+End Sub
+
+Sub GetRule() '获取路有规则信息
+	Dim a,b,c As Integer
+	
+	MaxNum_EN = PointGet("ColourGroup.Rule.MaxNum.EN")  '最大连续过车数
+	If MaxNum_En = true Then
+	   MaxNum = PointGet("ColourGroup.Rule.MaxNum.Num")
+	End If
+	
+	SamePC_EN = PointGet("ColourGroup.Rule.SamePC.EN") '相同中涂漆颜色
+	If SamePC_EN = true Then
+	   For a = 1 To 6 
+		   SamePC(1,a) = PointGet("ColourGroup.Rule.SamePC.1_Colour." & a )
+		   SamePC(2,a) = PointGet("ColourGroup.Rule.SamePC.2_Colour." & a )
+	   Next a
+	End If
+    '出口车型颜色规则
+	rStyle_EN = PointGet("ColourGroup.Rule.Style.Exit1.EN")
+	rColour_EN = PointGet("ColourGroup.Rule.Colour.Exit1.EN")
+	For c = 1 To 7
+		If rStyle_EN = true Then
+		    rStyle(c) = PointGet("ColourGroup.Rule.Style.Exit1." & c)
+		End If
+		If rColour_EN = true Then
+		   rColour(c) = PointGet("ColourGroup.Rule.Colour.Exit1." & c)
+		End If  
+	Next c 
+End Sub
+
+Function StyleRule(Route As Integer,NowStyle As String) As Boolean '判断是否满足车型规则
+	Dim a,b,c As Integer
+	
+	If rStyle_EN = false Then
+	   StyleRule = true
+	   Return
+	Else
+	   For a = 1 To 7 
+	   	   If rStyle(a)	= NowStyle Then
+			  StyleRule = true
+			  Return
+	   	   End If
+	   Next a 
+	End If
+	StyleRule = false
+	Return     
+End Function
+
+Function ColourRule(Route As Integer,NowColour As String) As Boolean '判断是否满足颜色规则
+	Dim a,b,c As Integer
+	
+	If rColour_EN = false Then
+	   ColourRule = true
+	   Return
+	Else
+	   For a = 1 To 7 
+	   	   If rColour(a) = NowColour Then
+			  ColourRule = true
+			  Return
+	   	   End If
+	   Next a 
+	End If
+	ColourRule = false
+	Return     
+End Function
+
+Function SamePCRoute(Route As Integer,NowColour As String) As Boolean '判断是否有同中涂
+	Dim a,b,c As Integer
+	Dim PCNum As Integer
+	
+	PCNum = 0
+	SamePCRoute = false
+	For a = 1 To 2 
+	   For b = 1 To 6
+		  If sColour(Route,1) = SamePC(a,b) And SamePC(a,b) <> "" Then
+		  	 PCNum = a
+		  End If  
+	   Next b
+	Next
+	If PCNum = 0 Then
+	   Return
+	Else
+	   For c = 1 To 6
+		  If SamePC(a,b) = NowColour And SamePC(a,b) <> "" Then
+		  	 SamePCRoute = true
+			 Return
+		  End If 
+	   Next c
+	End If
+
+
+End Function
+
+Function SameColourRoute(NowColour As String,NowStyle As String) As Integer	'判断是否有相同颜色道
+	Dim a As Integer
+	
+	For a = 2 To 1 Step -1
+		If Num(a) > 0 And Exit_EN(a) = false Then   
+		   If sColour(1,1) = NowColour And StyleRule(a,NowStyle) = true And ColourRule(a,NowColour) = true Then
+		   	  SameColourRoute = a
+			  Return
+		   End If  
+		End If 
+	Next a
+	If SamePC_EN = true Then   '判断相同中涂
+	   For a = 2 To 1 Step -1
+		   If Num(a) > 0 And Exit_EN(a) = false Then
+		   	  If SamePCRoute(a,NowColour) = true And StyleRule(a,NowStyle) = true And ColourRule(a,NowColour) = true Then
+				 SameColourRoute = a
+				 Return
+			  End If 
+		   End If  
+	   Next a 
+	End If 
+	SameColourRoute = 0
+	Return
+End Function
+
+
+
+Function MaxNumRouet(NowColour As String,NowStyle As String) As Integer '寻找最少车数车道
+	Dim a As Integer
+	Dim MaxNum As Integer
+	MaxNum = 0
+	MaxNumRouet = 0
+	For a = 2 To 1 Step -1
+		If Num(a) > MaxNum And StyleRule(a,NowStyle) = true And ColourRule(a,NowColour) = true And Exit_EN(a) = false Then
+		   MaxNum = Num(a)
+		   MaxNumRouet = a
+		End If   
+	Next a 
+End Function
+
+Sub Main()
+On Error GoTo Err1
+   	Call GetData
+	Call GetRule
+	
+	Dim Route As Integer
+	Dim NowColour As String
+	Dim NowStyle As String
+	Dim NowNum As Integer
+	
+	NowNum = PointGet("ColourGroup.Rule.MaxNum.Exit1Num") 
+	NowColour = PointGet("ColourGroup.Data.Exit.1Save.Colour")
+	NowStyle = PointGet("ColourGroup.Data.Exit.1Save.Style")
+
+	If MaxNum_EN = true And NowNum >= MaxNum Then 
+	   PointSet "ColourGroup.Rule.MaxNum.Exit1Num",0
+	Else
+	   Route = SameColourRoute(NowColour,NowStyle)
+	   If Route <> 0 Then
+	      PointSet "ColourGroup.Route.Exit.1.Num",Route
+		  PointSet "ColourGroup.Route.Exit.1.OK",1
+	      Exit Sub
+	   End If
+	End If
+	    
+	Route = MaxNumRouet(NowColour,NowStyle)
+	If Route <> 0 Then  
+	      PointSet "ColourGroup.Route.Exit.1.Num",Route
+		  PointSet "ColourGroup.Route.Exit.1.OK",1
+	   PointSet "ColourGroup.Rule.MaxNum.Exit1Num",0
+	   Exit Sub
+	End If 
+
+    Exit Sub
+
+Err1:
+	 
+End Sub
